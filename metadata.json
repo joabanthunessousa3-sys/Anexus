@@ -1,0 +1,8 @@
+{
+  "name": "Anexus",
+  "description": "Gravador de tela Android profissional e moderno com alta performance, captura de áudio interno e microfone, controles flutuantes invisíveis e Quick Settings Tile.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

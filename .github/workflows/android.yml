@@ -1,0 +1,78 @@
+name: Anexus Android CI
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build & Package Anexus APK (SDK & NDK)
+    runs-on: ubuntu-latest
+
+    env:
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_NDK_VERSION: "26.1.10909125"
+      ANDROID_NDK_HOME: /usr/local/lib/android/sdk/ndk/26.1.10909125
+      ANDROID_NDK_ROOT: /usr/local/lib/android/sdk/ndk/26.1.10909125
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install & Configure Android SDK, NDK and CMake
+        run: |
+          echo "y" | sudo "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+          sudo "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" --install \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "cmdline-tools;latest" \
+            "ndk;${ANDROID_NDK_VERSION}" \
+            "cmake;3.22.1" || true
+
+      - name: Verify Android SDK and NDK Installation
+        run: |
+          echo "Android SDK directory:"
+          ls -ld "${ANDROID_SDK_ROOT}"
+          echo "Android NDK directory:"
+          ls -ld "${ANDROID_NDK_HOME}" || true
+
+      - name: Make Gradle Wrapper Executable
+        run: chmod +x gradlew
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Verify APK Generation
+        run: |
+          if [ -f app/build/outputs/apk/debug/app-debug.apk ]; then
+            echo "SUCCESS: app-debug.apk generated successfully!"
+            ls -lh app/build/outputs/apk/debug/app-debug.apk
+          else
+            echo "Searching for any generated APK files..."
+            find app/build/outputs/ -name "*.apk"
+          fi
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: anexus-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 14

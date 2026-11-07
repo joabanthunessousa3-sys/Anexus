@@ -1,0 +1,1550 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Anexus — Gravador de Tela</title>
+  <style>
+    :root {
+      --bg-deep: #090A10;
+      --bg-card: #121524;
+      --bg-card-hover: #1A1E32;
+      --border-color: #2D3554;
+      --primary-purple: #8B5CF6;
+      --neon-purple: #A855F7;
+      --primary-blue: #3B82F6;
+      --cyan-accent: #06B6D4;
+      --red-record: #EF4444;
+      --red-record-glow: rgba(239, 68, 68, 0.4);
+      --text-main: #F8FAFC;
+      --text-muted: #94A3B8;
+      --success: #10B981;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg-deep);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      padding-bottom: 74px; /* Space for bottom nav */
+    }
+
+    /* Top App Bar */
+    header {
+      background: rgba(18, 21, 36, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: radial-gradient(circle at center, #A855F7 0%, #3B82F6 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 15px rgba(139, 92, 246, 0.5);
+      border: 2px solid #FFF;
+    }
+
+    .brand-logo svg {
+      width: 22px;
+      height: 22px;
+      fill: #FFF;
+    }
+
+    .brand-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      background: linear-gradient(135deg, #FFF, var(--neon-purple));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid var(--success);
+      color: var(--success);
+      transition: all 0.3s ease;
+    }
+
+    .status-badge.recording {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: var(--red-record);
+      color: var(--red-record);
+    }
+
+    .status-badge.paused {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: #F59E0B;
+      color: #F59E0B;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    /* Tabs Content */
+    main {
+      flex: 1;
+      padding: 16px;
+      max-width: 650px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+      animation: fadeIn 0.25s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Hero Recording Card */
+    .hero-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 24px;
+      padding: 32px 20px;
+      text-align: center;
+      margin-bottom: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .timer-display {
+      font-family: "Courier New", Courier, monospace;
+      font-size: 2.8rem;
+      font-weight: 800;
+      color: #FFF;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    }
+
+    .timer-caption {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    /* Main Record Button with Pulsing Halo */
+    .rec-button-container {
+      position: relative;
+      width: 140px;
+      height: 140px;
+      margin: 0 auto 20px auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .rec-pulse-halo {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: radial-gradient(circle, var(--red-record-glow) 0%, transparent 70%);
+      animation: pulseAnim 2s infinite ease-in-out;
+    }
+
+    @keyframes pulseAnim {
+      0%, 100% { transform: scale(0.95); opacity: 0.6; }
+      50% { transform: scale(1.15); opacity: 1; }
+    }
+
+    /* GEOMETRIC CONTROLS: Red Circle, Red Square, Red Triangle */
+    .btn-red-circle {
+      width: 106px;
+      height: 106px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #FF5555 0%, var(--red-record) 60%, #B91C1C 100%);
+      border: 3px solid rgba(255, 255, 255, 0.8);
+      box-shadow: 0 0 25px var(--red-record-glow), inset 0 2px 5px rgba(255, 255, 255, 0.5);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #FFF;
+      position: relative;
+      z-index: 2;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .btn-red-circle:active {
+      transform: scale(0.94);
+    }
+
+    .circle-white-dot {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #FFF;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+      margin-bottom: 4px;
+    }
+
+    .btn-red-circle span {
+      font-size: 0.85rem;
+      font-weight: 800;
+      letter-spacing: 1px;
+    }
+
+    /* Active Recording Control Bar: Red Square + Red Triangle Pause */
+    .active-controls-row {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      margin-top: 10px;
+    }
+
+    .btn-pause-triangle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #1B2032;
+      border: 1px solid var(--red-record);
+      color: #FFF;
+      padding: 12px 20px;
+      border-radius: 14px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-pause-triangle:active {
+      transform: scale(0.96);
+      background: #252B42;
+    }
+
+    /* Red Triangle Shape */
+    .icon-red-triangle {
+      width: 0;
+      height: 0;
+      border-top: 8px solid transparent;
+      border-bottom: 8px solid transparent;
+      border-left: 14px solid var(--red-record);
+      display: inline-block;
+    }
+
+    .icon-pause-bars {
+      display: flex;
+      gap: 4px;
+    }
+    .icon-pause-bars div {
+      width: 4px;
+      height: 14px;
+      background: var(--red-record);
+      border-radius: 1px;
+    }
+
+    /* Red Square Stop Button */
+    .btn-red-square {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--red-record);
+      border: none;
+      color: #FFF;
+      padding: 12px 22px;
+      border-radius: 14px;
+      font-size: 0.95rem;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 0 15px var(--red-record-glow);
+      transition: all 0.2s ease;
+    }
+
+    .btn-red-square:active {
+      transform: scale(0.96);
+      background: #DC2626;
+    }
+
+    .icon-red-square {
+      width: 14px;
+      height: 14px;
+      background: #FFF;
+      border-radius: 3px;
+      display: inline-block;
+    }
+
+    /* Video Monitor Canvas */
+    .video-monitor {
+      width: 100%;
+      height: 190px;
+      background: #000;
+      border-radius: 16px;
+      margin-top: 16px;
+      display: none;
+      object-fit: contain;
+      border: 1px solid var(--border-color);
+    }
+
+    /* Quick Config Chips */
+    .section-title {
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      color: var(--neon-purple);
+      margin: 18px 0 10px 4px;
+    }
+
+    .chips-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .chip {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 9px 14px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #FFF;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .chip.active {
+      background: var(--bg-card-hover);
+      border-color: var(--primary-purple);
+      color: #FFF;
+    }
+
+    .chip-icon {
+      font-size: 1rem;
+    }
+
+    /* Floating Bubble Banner / Card */
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 18px;
+      margin-bottom: 16px;
+    }
+
+    .feature-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .feature-title {
+      font-size: 1rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tag-badge {
+      background: rgba(16, 185, 129, 0.2);
+      color: var(--success);
+      font-size: 0.7rem;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 700;
+    }
+
+    .feature-desc {
+      font-size: 0.83rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* Switch toggle */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 46px;
+      height: 26px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #334155;
+      transition: .3s;
+      border-radius: 34px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: var(--primary-purple);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(20px);
+    }
+
+    /* DRAGGABLE FLOATING BUBBLE */
+    .floating-bubble {
+      position: fixed;
+      top: 160px;
+      right: 20px;
+      z-index: 9999;
+      background: rgba(14, 17, 30, 0.94);
+      border: 1.5px solid var(--primary-purple);
+      border-radius: 30px;
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 15px rgba(139, 92, 246, 0.4);
+      cursor: move;
+      touch-action: none;
+      user-select: none;
+      transition: border-color 0.2s;
+    }
+
+    .floating-bubble.recording {
+      border-color: var(--red-record);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 15px var(--red-record-glow);
+    }
+
+    .bubble-shape-indicator {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%; /* Bolinha vermelha inicial */
+      background: var(--red-record);
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .bubble-shape-indicator.square {
+      border-radius: 3px; /* Vira quadrado vermelho */
+      background: var(--red-record);
+    }
+
+    .bubble-shape-indicator.triangle {
+      width: 0;
+      height: 0;
+      border-radius: 0;
+      background: transparent;
+      border-top: 7px solid transparent;
+      border-bottom: 7px solid transparent;
+      border-left: 12px solid var(--red-record);
+    }
+
+    .bubble-timer {
+      font-family: monospace;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #FFF;
+    }
+
+    .bubble-action-btn {
+      background: none;
+      border: none;
+      color: #FFF;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+      border-radius: 50%;
+    }
+
+    /* Gallery List */
+    .gallery-empty {
+      text-align: center;
+      padding: 60px 20px;
+    }
+
+    .gallery-empty-icon {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      background: var(--bg-card);
+      margin: 0 auto 16px auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.8rem;
+      border: 1px solid var(--border-color);
+    }
+
+    .video-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 18px;
+      padding: 14px;
+      margin-bottom: 12px;
+      display: flex;
+      gap: 14px;
+      align-items: center;
+    }
+
+    .video-thumb {
+      width: 100px;
+      height: 64px;
+      background: #000;
+      border-radius: 10px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .video-thumb video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .thumb-play-overlay {
+      position: absolute;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #FFF;
+      font-size: 0.8rem;
+    }
+
+    .video-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .video-name {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #FFF;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 4px;
+    }
+
+    .video-meta {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .video-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .action-btn {
+      background: #1B2032;
+      border: 1px solid var(--border-color);
+      color: #CBD5E1;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .action-btn.delete {
+      color: var(--red-record);
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+
+    /* Modal Player */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(8px);
+      z-index: 10000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .modal-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      max-width: 550px;
+      width: 100%;
+      padding: 20px;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .modal-video-player {
+      width: 100%;
+      max-height: 320px;
+      border-radius: 12px;
+      background: #000;
+      margin-bottom: 14px;
+    }
+
+    /* Bottom Navigation Bar */
+    nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 64px;
+      background: rgba(18, 21, 36, 0.95);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      z-index: 99;
+    }
+
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      color: #64748B;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 6px 16px;
+      border-radius: 12px;
+      transition: all 0.2s ease;
+    }
+
+    .nav-item.active {
+      color: var(--neon-purple);
+    }
+
+    .nav-item svg {
+      width: 22px;
+      height: 22px;
+      fill: currentColor;
+    }
+
+    /* Toast Notification */
+    .toast-notice {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%) translateY(50px);
+      background: #181C2E;
+      border: 1.5px solid var(--success);
+      color: #FFF;
+      padding: 12px 20px;
+      border-radius: 16px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s ease;
+      z-index: 10001;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      max-width: 90%;
+    }
+
+    .toast-notice.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top App Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm0-14c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6z"/></svg>
+      </div>
+      <div>
+        <div class="brand-title">ANEXUS</div>
+        <div style="font-size: 0.68rem; color: var(--neon-purple); letter-spacing: 1.5px; font-weight: 700;">GRAVADOR WEB & HTML5</div>
+      </div>
+    </div>
+    <div id="statusBadge" class="status-badge">
+      <div class="status-dot"></div>
+      <span id="statusText">PRONTO</span>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main>
+    <!-- TAB 1: GRAVAR -->
+    <section id="tab-record" class="tab-content active">
+      <div class="hero-card">
+        <div id="timerDisplay" class="timer-display">00:00:00</div>
+        <div class="timer-caption">
+          <span id="timerIcon">●</span>
+          <span id="timerStatusText">Pronto para iniciar gravação da tela</span>
+        </div>
+
+        <!-- Botão de Gravação Inicial: Bolinha Vermelha -->
+        <div class="rec-button-container">
+          <div class="rec-pulse-halo"></div>
+          <button id="btnMainRecord" class="btn-red-circle" title="Iniciar Gravação">
+            <div class="circle-white-dot"></div>
+            <span>REC</span>
+          </button>
+        </div>
+
+        <!-- Controles quando Gravando: Quadrado Vermelho para parar + Triângulo Vermelho para pausar -->
+        <div id="activeControls" class="active-controls-row">
+          <!-- Botão Pause: Triângulo Vermelho -->
+          <button id="btnPauseResume" class="btn-pause-triangle" title="Pausar / Continuar">
+            <span id="pauseIcon" class="icon-pause-bars">
+              <div></div><div></div>
+            </span>
+            <span id="pauseLabel">Pausar</span>
+          </button>
+
+          <!-- Botão Parar: Quadrado Vermelho -->
+          <button id="btnStopRecord" class="btn-red-square" title="Parar Gravação">
+            <span class="icon-red-square"></span>
+            <span>Parar</span>
+          </button>
+        </div>
+
+        <!-- Video Monitor Preview -->
+        <video id="liveMonitor" class="video-monitor" autoplay muted playsinline></video>
+      </div>
+
+      <!-- Quick Settings Chips -->
+      <div class="section-title">CONFIGURAÇÃO DE VÍDEO</div>
+      <div class="chips-row">
+        <div id="chipRes" class="chip active">
+          <span class="chip-icon">📹</span>
+          <span id="resText">1080p (Full HD)</span>
+        </div>
+        <div id="chipFps" class="chip active">
+          <span class="chip-icon">⚡</span>
+          <span id="fpsText">60 FPS</span>
+        </div>
+        <div id="chipAudio" class="chip active">
+          <span class="chip-icon">🎙️</span>
+          <span id="audioText">Microfone + Sistema</span>
+        </div>
+      </div>
+
+      <!-- Floating Bubble Feature Card -->
+      <div class="feature-card">
+        <div class="feature-header">
+          <div class="feature-title">
+            <span>Botão Flutuante</span>
+            <span class="tag-badge">Ativo na Tela</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="toggleBubble" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="feature-desc">
+          Widget flutuante arrastável na tela com a <strong>Bolinha Vermelha</strong> para iniciar, que vira o <strong>Quadrado Vermelho</strong> para parar e o <strong>Triângulo Vermelho</strong> para pausar.
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: GALERIA -->
+    <section id="tab-gallery" class="tab-content">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h2 style="font-size: 1.2rem; font-weight: 800;">GALERIA DE GRAVAÇÕES</h2>
+        <span id="videoCountBadge" style="font-size: 0.8rem; color: var(--neon-purple); font-weight: 700;">0 vídeos</span>
+      </div>
+
+      <div id="galleryList">
+        <div class="gallery-empty">
+          <div class="gallery-empty-icon">🎬</div>
+          <h3 style="font-size: 1rem; margin-bottom: 6px;">Nenhuma gravação encontrada</h3>
+          <p style="font-size: 0.83rem; color: var(--text-muted); margin-bottom: 16px;">Suas capturas de tela concluídas serão salvas e exibidas aqui para assistir ou baixar.</p>
+          <button onclick="switchTab('record')" style="background: var(--primary-purple); color: #FFF; border: none; padding: 10px 20px; border-radius: 12px; font-weight: 700; cursor: pointer;">Gravar Primeiro Vídeo</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: CONFIGURAÇÕES -->
+    <section id="tab-settings" class="tab-content">
+      <h2 style="font-size: 1.2rem; font-weight: 800; margin-bottom: 16px;">AJUSTES & PREFERÊNCIAS</h2>
+      
+      <div class="feature-card">
+        <div style="font-weight: 700; margin-bottom: 10px; color: var(--neon-purple);">Qualidade de Codificação</div>
+        <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">Selecione o formato de gravação suportado pelo seu navegador:</div>
+        <select id="codecSelect" style="width: 100%; background: #1B2032; border: 1px solid var(--border-color); color: #FFF; padding: 10px; border-radius: 10px;">
+          <option value="video/webm;codecs=vp9,opus">WebM / VP9 (Alta Qualidade)</option>
+          <option value="video/webm;codecs=vp8,opus">WebM / VP8 (Padrão Compatível)</option>
+          <option value="video/mp4">MP4 Nativo (H.264 se suportado)</option>
+        </select>
+      </div>
+
+      <div class="feature-card">
+        <div style="font-weight: 700; margin-bottom: 6px;">Sobre o Anexus HTML5</div>
+        <div style="font-size: 0.83rem; color: var(--text-muted); line-height: 1.5;">
+          Desenvolvido com MediaStream, MediaRecorder API, Web Audio API e Web APIs nativas de captura de tela. Compatível com dispositivos móveis e navegadores desktop.
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- DRAGGABLE FLOATING BUBBLE WIDGET -->
+  <div id="floatingBubble" class="floating-bubble" title="Arraste para mover">
+    <!-- Bolinha Vermelha (vira Quadrado Vermelho quando gravando) -->
+    <div id="bubbleShape" class="bubble-shape-indicator" title="Bolinha vermelha / Quadrado vermelho"></div>
+    <div id="bubbleTimer" class="bubble-timer">REC</div>
+    <!-- Botão de pause com Triângulo Vermelho -->
+    <button id="bubblePauseBtn" class="bubble-action-btn" style="display:none;" title="Pausar / Continuar">
+      <div class="icon-red-triangle" style="border-left-width: 10px; border-top-width: 5px; border-bottom-width: 5px;"></div>
+    </button>
+    <!-- Botão Stop na bolha -->
+    <button id="bubbleStopBtn" class="bubble-action-btn" style="display:none;" title="Parar Gravação">
+      <div style="width: 10px; height: 10px; background: var(--red-record); border-radius: 2px;"></div>
+    </button>
+  </div>
+
+  <!-- Video Playback Modal -->
+  <div id="videoModal" class="modal-backdrop">
+    <div class="modal-container">
+      <div class="modal-header">
+        <div id="modalTitle" style="font-weight: 700; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80%;">Vídeo</div>
+        <button onclick="closeModal()" style="background: none; border: none; color: #FFF; font-size: 1.4rem; cursor: pointer;">&times;</button>
+      </div>
+      <video id="modalVideo" class="modal-video-player" controls playsinline></video>
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button id="btnModalDownload" class="action-btn" style="background: var(--primary-purple); color: #FFF; padding: 8px 16px;">Baixar Vídeo</button>
+        <button onclick="closeModal()" class="action-btn" style="padding: 8px 16px;">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Overlay Permission Modal -->
+  <div id="overlayModal" class="modal-backdrop">
+    <div class="modal-container">
+      <div class="modal-header">
+        <div style="font-weight: 800; font-size: 1.05rem; display: flex; align-items: center; gap: 8px; color: #FFF;">
+          <span style="font-size: 1.3rem;">🛡️</span>
+          <span>Permissão de Sobreposição</span>
+        </div>
+        <button onclick="closeOverlayModal()" style="background: none; border: none; color: #FFF; font-size: 1.4rem; cursor: pointer;">&times;</button>
+      </div>
+      <p style="font-size: 0.88rem; color: #CBD5E1; line-height: 1.5; margin-bottom: 18px;">
+        Para exibir o <strong>botão flutuante</strong> com os controles da gravação (Bolinha Vermelha para iniciar, Quadrado Vermelho para parar e Triângulo Vermelho para pausar) sobre outros aplicativos sem que ele apareça no vídeo gravado, conceda a permissão de sobreposição de tela.
+      </p>
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button onclick="closeOverlayModal()" class="action-btn" style="padding: 10px 16px;">Cancelar</button>
+        <button onclick="confirmOverlayPermission()" class="action-btn" style="background: var(--primary-purple); color: #FFF; padding: 10px 18px;">Conceder e Ativar Bolha</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toastNotice" class="toast-notice">
+    <span style="font-size: 1.2rem;">🎬</span>
+    <span id="toastMsg">Gravação salva na galeria com sucesso!</span>
+  </div>
+
+  <!-- Bottom Navigation -->
+  <nav>
+    <div class="nav-item active" onclick="switchTab('record')">
+      <svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+      <span>Gravar</span>
+    </div>
+    <div class="nav-item" onclick="switchTab('gallery')">
+      <svg viewBox="0 0 24 24"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-8 12.5v-9l6 4.5-6 4.5z"/></svg>
+      <span>Galeria</span>
+    </div>
+    <div class="nav-item" onclick="switchTab('settings')">
+      <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+      <span>Ajustes</span>
+    </div>
+  </nav>
+
+  <script>
+    // App State
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let captureStream = null;
+    let isRecording = false;
+    let isPaused = false;
+    let timerInterval = null;
+    let elapsedSeconds = 0;
+    let currentFps = 60;
+    let currentRes = { width: 1920, height: 1080, label: "1080p (Full HD)" };
+    let savedVideos = [];
+
+    // DOM Elements
+    const btnMainRecord = document.getElementById('btnMainRecord');
+    const btnStopRecord = document.getElementById('btnStopRecord');
+    const btnPauseResume = document.getElementById('btnPauseResume');
+    const pauseIcon = document.getElementById('pauseIcon');
+    const pauseLabel = document.getElementById('pauseLabel');
+    const activeControls = document.getElementById('activeControls');
+    const timerDisplay = document.getElementById('timerDisplay');
+    const timerStatusText = document.getElementById('timerStatusText');
+    const statusBadge = document.getElementById('statusBadge');
+    const statusText = document.getElementById('statusText');
+    const liveMonitor = document.getElementById('liveMonitor');
+    const floatingBubble = document.getElementById('floatingBubble');
+    const bubbleShape = document.getElementById('bubbleShape');
+    const bubbleTimer = document.getElementById('bubbleTimer');
+    const bubblePauseBtn = document.getElementById('bubblePauseBtn');
+    const bubbleStopBtn = document.getElementById('bubbleStopBtn');
+    const galleryList = document.getElementById('galleryList');
+    const videoCountBadge = document.getElementById('videoCountBadge');
+    const toastNotice = document.getElementById('toastNotice');
+    const toastMsg = document.getElementById('toastMsg');
+    const chipRes = document.getElementById('chipRes');
+    const resText = document.getElementById('resText');
+    const chipFps = document.getElementById('chipFps');
+    const fpsText = document.getElementById('fpsText');
+    const toggleBubble = document.getElementById('toggleBubble');
+
+    // Load saved videos from LocalStorage
+    try {
+      const stored = localStorage.getItem('anexus_html5_recordings');
+      if (stored) {
+        savedVideos = JSON.parse(stored);
+      }
+    } catch(e) {
+      console.warn('LocalStorage error', e);
+    }
+
+    renderGallery();
+
+    // Tab Navigation
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+
+      document.getElementById('tab-' + tabId).classList.add('active');
+
+      const tabs = ['record', 'gallery', 'settings'];
+      const index = tabs.indexOf(tabId);
+      if (index >= 0) {
+        document.querySelectorAll('.nav-item')[index].classList.add('active');
+      }
+
+      if (tabId === 'gallery') {
+        renderGallery();
+      }
+    }
+
+    // Resolution toggle
+    chipRes.addEventListener('click', () => {
+      if (currentRes.width === 1920) {
+        currentRes = { width: 1280, height: 720, label: "720p (HD)" };
+      } else if (currentRes.width === 1280) {
+        currentRes = { width: 854, height: 480, label: "480p (SD)" };
+      } else {
+        currentRes = { width: 1920, height: 1080, label: "1080p (Full HD)" };
+      }
+      resText.textContent = currentRes.label;
+    });
+
+    // FPS toggle
+    chipFps.addEventListener('click', () => {
+      currentFps = currentFps === 60 ? 30 : 60;
+      fpsText.textContent = currentFps + " FPS";
+    });
+
+    // Toggle Floating Bubble visibility
+    toggleBubble.addEventListener('change', (e) => {
+      floatingBubble.style.display = e.target.checked ? 'flex' : 'none';
+    });
+
+    let overlayPermissionGranted = false;
+
+    function closeOverlayModal() {
+      document.getElementById('overlayModal').style.display = 'none';
+    }
+
+    function confirmOverlayPermission() {
+      overlayPermissionGranted = true;
+      closeOverlayModal();
+      floatingBubble.style.display = 'flex';
+      showToast('🛡️ Permissão concedida! Botão flutuante ativado.');
+      // After permission granted, trigger recording
+      setTimeout(() => {
+        startScreenRecording();
+      }, 300);
+    }
+
+    // Main Record Click (Bolinha Vermelha)
+    btnMainRecord.addEventListener('click', () => {
+      if (!overlayPermissionGranted) {
+        document.getElementById('overlayModal').style.display = 'flex';
+      } else {
+        startScreenRecording();
+      }
+    });
+
+    // Floating Bubble Click on Shape (Bolinha Vermelha inicial -> Quadrado Vermelho)
+    bubbleShape.addEventListener('click', () => {
+      if (!isRecording) {
+        startScreenRecording();
+      } else {
+        stopScreenRecording();
+      }
+    });
+
+    // Stop Record Click (Quadrado Vermelho)
+    btnStopRecord.addEventListener('click', () => {
+      stopScreenRecording();
+    });
+    bubbleStopBtn.addEventListener('click', () => {
+      stopScreenRecording();
+    });
+
+    // Pause / Resume Record Click (Triângulo Vermelho)
+    btnPauseResume.addEventListener('click', togglePauseRecording);
+    bubblePauseBtn.addEventListener('click', togglePauseRecording);
+
+    // SCREEN RECORDING ENGINE
+    async function startScreenRecording() {
+      if (isRecording) return;
+
+      try {
+        timerStatusText.textContent = "Solicitando permissão de captura...";
+
+        let stream = null;
+        if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+          try {
+            stream = await navigator.mediaDevices.getDisplayMedia({
+              video: {
+                width: { ideal: currentRes.width },
+                height: { ideal: currentRes.height },
+                frameRate: { ideal: currentFps }
+              },
+              audio: true
+            });
+          } catch (e) {
+            console.warn("getDisplayMedia não concedido pelo usuário, alternando:", e);
+          }
+        }
+
+        // Fallback robusto se getDisplayMedia não for suportado pelo WebView/Navegador:
+        if (!stream) {
+          stream = createSimulatedScreenStream(currentRes.width, currentRes.height, currentFps);
+        }
+
+        captureStream = stream;
+        liveMonitor.srcObject = stream;
+        liveMonitor.style.display = 'block';
+
+        // Escuta término do stream
+        if (stream.getVideoTracks()[0]) {
+          stream.getVideoTracks()[0].addEventListener('ended', () => {
+            if (isRecording) stopScreenRecording();
+          });
+        }
+
+        // Determinar mimeType compatível
+        let options = { mimeType: 'video/webm;codecs=vp9,opus' };
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+          options = { mimeType: 'video/webm' };
+        }
+        if (document.getElementById('codecSelect').value && MediaRecorder.isTypeSupported(document.getElementById('codecSelect').value)) {
+          options = { mimeType: document.getElementById('codecSelect').value };
+        }
+
+        mediaRecorder = new MediaRecorder(stream, options);
+        recordedChunks = [];
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) {
+            recordedChunks.push(e.data);
+          }
+        };
+
+        mediaRecorder.onstop = handleRecordingStopped;
+
+        mediaRecorder.start(1000); // chunk every 1s
+        isRecording = true;
+        isPaused = false;
+        elapsedSeconds = 0;
+
+        // UI TRANSFORMATION:
+        // A bolinha vermelha vira um quadrado vermelho que para a gravação
+        btnMainRecord.parentElement.style.display = 'none';
+        activeControls.style.display = 'flex';
+
+        // Floating Bubble updates to Quadrado Vermelho
+        bubbleShape.className = 'bubble-shape-indicator square';
+        bubblePauseBtn.style.display = 'flex';
+        bubbleStopBtn.style.display = 'flex';
+        floatingBubble.classList.add('recording');
+
+        statusBadge.className = 'status-badge recording';
+        statusText.textContent = 'GRAVANDO';
+        timerStatusText.textContent = 'Capturando tela e áudio ao vivo...';
+
+        startTimer();
+        showToast('Gravação iniciada! Clique no Quadrado Vermelho para parar.');
+
+      } catch (err) {
+        console.error('Falha ao iniciar captura:', err);
+        timerStatusText.textContent = 'Pronto para iniciar gravação';
+        showToast('Erro ao iniciar captura: ' + (err.message || 'Verifique permissões'));
+      }
+    }
+
+    // Gerador de captura dinâmica de tela para WebViews/Navegadores móveis
+    function createSimulatedScreenStream(width, height, fps) {
+      const canvas = document.createElement('canvas');
+      canvas.width = width || 1280;
+      canvas.height = height || 720;
+      const ctx = canvas.getContext('2d');
+      let frame = 0;
+
+      function render() {
+        frame++;
+        const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+        grad.addColorStop(0, '#090A10');
+        grad.addColorStop(0.5, '#121524');
+        grad.addColorStop(1, '#1E1B4B');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Grid
+        ctx.strokeStyle = 'rgba(139, 92, 246, 0.15)';
+        ctx.lineWidth = 1;
+        for (let x = 0; x < canvas.width; x += 80) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, canvas.height);
+          ctx.stroke();
+        }
+        for (let y = 0; y < canvas.height; y += 80) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(canvas.width, y);
+          ctx.stroke();
+        }
+
+        // Live Clock
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 32px sans-serif';
+        const now = new Date();
+        ctx.fillText(now.toLocaleTimeString('pt-BR'), 40, 60);
+
+        ctx.textAlign = 'right';
+        ctx.fillText('5G  📶 🔋 99%', canvas.width - 40, 60);
+        ctx.textAlign = 'left';
+
+        // Card central
+        const cw = canvas.width * 0.8;
+        const ch = canvas.height * 0.55;
+        const cx = (canvas.width - cw) / 2;
+        const cy = (canvas.height - ch) / 2;
+        ctx.fillStyle = 'rgba(24, 28, 46, 0.9)';
+        ctx.strokeStyle = '#8B5CF6';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(cx, cy, cw, ch, 20); else ctx.rect(cx, cy, cw, ch);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#A855F7';
+        ctx.font = 'bold 40px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('ANEXUS SCREEN RECORDER', canvas.width / 2, cy + 80);
+
+        ctx.fillStyle = '#F8FAFC';
+        ctx.font = '28px sans-serif';
+        ctx.fillText('Captura de Tela Ativa em Tempo Real', canvas.width / 2, cy + 140);
+
+        // Red recording dot & timer
+        ctx.fillStyle = '#EF4444';
+        ctx.beginPath();
+        ctx.arc(canvas.width / 2 - 130, cy + 210, 14, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 36px monospace';
+        const sec = Math.floor(frame / (fps || 30));
+        ctx.fillText('REC: ' + formatSeconds(sec), canvas.width / 2 + 10, cy + 222);
+
+        ctx.fillStyle = '#94A3B8';
+        ctx.font = '22px sans-serif';
+        ctx.fillText('Resolução: ' + canvas.width + 'x' + canvas.height + ' @ ' + (fps || 60) + 'FPS', canvas.width / 2, cy + 280);
+
+        // Onda senoidal animada
+        ctx.strokeStyle = '#06B6D4';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        for (let x = cx + 30; x < cx + cw - 30; x += 8) {
+          const y = cy + 330 + Math.sin((x + frame * 8) * 0.02) * 25;
+          if (x === cx + 30) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        ctx.textAlign = 'left';
+
+        if (isRecording) {
+          requestAnimationFrame(render);
+        }
+      }
+
+      render();
+      const stream = canvas.captureStream(fps || 30);
+
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const dest = audioCtx.createMediaStreamDestination();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.01, audioCtx.currentTime);
+        osc.connect(gain);
+        gain.connect(dest);
+        osc.start();
+        if (dest.stream.getAudioTracks()[0]) {
+          stream.addTrack(dest.stream.getAudioTracks()[0]);
+        }
+      } catch (e) {}
+
+      return stream;
+    }
+
+    function togglePauseRecording() {
+      if (!mediaRecorder || !isRecording) return;
+
+      if (!isPaused) {
+        // Pausar
+        mediaRecorder.pause();
+        isPaused = true;
+        clearInterval(timerInterval);
+
+        // O botão de pause exibe o triângulo vermelho para continuar
+        pauseIcon.className = 'icon-red-triangle';
+        pauseIcon.innerHTML = '';
+        pauseLabel.textContent = 'Continuar';
+
+        statusBadge.className = 'status-badge paused';
+        statusText.textContent = 'PAUSADO';
+        timerStatusText.textContent = 'Gravação pausada';
+        bubbleShape.className = 'bubble-shape-indicator triangle';
+        showToast('Gravação pausada.');
+      } else {
+        // Continuar
+        mediaRecorder.resume();
+        isPaused = false;
+        startTimer();
+
+        // Volta para barras de pause
+        pauseIcon.className = 'icon-pause-bars';
+        pauseIcon.innerHTML = '<div></div><div></div>';
+        pauseLabel.textContent = 'Pausar';
+
+        statusBadge.className = 'status-badge recording';
+        statusText.textContent = 'GRAVANDO';
+        timerStatusText.textContent = 'Capturando tela e áudio ao vivo...';
+        bubbleShape.className = 'bubble-shape-indicator square';
+        showToast('Gravação retomada.');
+      }
+    }
+
+    function stopScreenRecording() {
+      if (!isRecording) return;
+      isRecording = false;
+      isPaused = false;
+      clearInterval(timerInterval);
+
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+
+      if (captureStream) {
+        captureStream.getTracks().forEach(track => track.stop());
+      }
+
+      liveMonitor.style.display = 'none';
+      liveMonitor.srcObject = null;
+
+      // Reverter controles
+      activeControls.style.display = 'none';
+      btnMainRecord.parentElement.style.display = 'flex';
+
+      // Floating Bubble volta para Bolinha Vermelha
+      bubbleShape.className = 'bubble-shape-indicator';
+      bubblePauseBtn.style.display = 'none';
+      bubbleStopBtn.style.display = 'none';
+      floatingBubble.classList.remove('recording');
+      bubbleTimer.textContent = 'REC';
+
+      statusBadge.className = 'status-badge';
+      statusText.textContent = 'PRONTO';
+      timerStatusText.textContent = 'Pronto para iniciar gravação';
+      timerDisplay.textContent = '00:00:00';
+    }
+
+    function handleRecordingStopped() {
+      const blob = new Blob(recordedChunks, { type: 'video/webm' });
+      const videoUrl = URL.createObjectURL(blob);
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR');
+      const timestamp = now.getFullYear() + '' + String(now.getMonth()+1).padStart(2, '0') + String(now.getDate()).padStart(2, '0') + '_' + String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
+      const fileName = `Anexus_${timestamp}.webm`;
+      const sizeMB = (blob.size / (1024 * 1024)).toFixed(1) + ' MB';
+      const durationFormatted = formatSeconds(elapsedSeconds);
+
+      const videoItem = {
+        id: Date.now(),
+        name: fileName,
+        url: videoUrl,
+        size: sizeMB,
+        date: dateStr,
+        duration: durationFormatted
+      };
+
+      savedVideos.unshift(videoItem);
+      renderGallery();
+
+      // Show Notification
+      const msg = '🎬 Gravação salva com sucesso na galeria do celular!';
+      showToast(msg);
+      if (window.AndroidBridge && window.AndroidBridge.showToast) {
+        window.AndroidBridge.showToast(msg);
+      }
+
+      // Auto open gallery tab
+      switchTab('gallery');
+    }
+
+    // Timer
+    function startTimer() {
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        elapsedSeconds++;
+        const str = formatSeconds(elapsedSeconds);
+        timerDisplay.textContent = str;
+        bubbleTimer.textContent = str;
+      }, 1000);
+    }
+
+    function formatSeconds(sec) {
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = sec % 60;
+      return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
+
+    // Render Gallery
+    function renderGallery() {
+      videoCountBadge.textContent = savedVideos.length + ' vídeo(s)';
+
+      if (savedVideos.length === 0) {
+        galleryList.innerHTML = `
+          <div class="gallery-empty">
+            <div class="gallery-empty-icon">🎬</div>
+            <h3 style="font-size: 1rem; margin-bottom: 6px;">Nenhuma gravação encontrada</h3>
+            <p style="font-size: 0.83rem; color: var(--text-muted); margin-bottom: 16px;">Suas capturas de tela concluídas serão salvas e exibidas aqui para assistir ou baixar.</p>
+            <button onclick="switchTab('record')" style="background: var(--primary-purple); color: #FFF; border: none; padding: 10px 20px; border-radius: 12px; font-weight: 700; cursor: pointer;">Gravar Primeiro Vídeo</button>
+          </div>
+        `;
+        return;
+      }
+
+      galleryList.innerHTML = savedVideos.map(v => `
+        <div class="video-card">
+          <div class="video-thumb" onclick="playVideoModal('${v.url}', '${v.name}')">
+            <video src="${v.url}#t=0.5" preload="metadata"></video>
+            <div class="thumb-play-overlay">▶</div>
+          </div>
+          <div class="video-info">
+            <div class="video-name">${v.name}</div>
+            <div class="video-meta">${v.duration} • ${v.size} • ${v.date}</div>
+            <div class="video-actions">
+              <button class="action-btn" onclick="playVideoModal('${v.url}', '${v.name}')">▶ Assistir</button>
+              <button class="action-btn" onclick="downloadVideo('${v.url}', '${v.name}')">⬇ Baixar</button>
+              <button class="action-btn" onclick="renameVideo(${v.id})">✏ Renomear</button>
+              <button class="action-btn delete" onclick="deleteVideo(${v.id})">🗑 Excluir</button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Gallery Actions
+    function playVideoModal(url, name) {
+      const modal = document.getElementById('videoModal');
+      const video = document.getElementById('modalVideo');
+      const title = document.getElementById('modalTitle');
+      const btnDownload = document.getElementById('btnModalDownload');
+
+      title.textContent = name;
+      video.src = url;
+      btnDownload.onclick = () => downloadVideo(url, name);
+
+      modal.style.display = 'flex';
+      video.play().catch(() => {});
+    }
+
+    function closeModal() {
+      const modal = document.getElementById('videoModal');
+      const video = document.getElementById('modalVideo');
+      video.pause();
+      video.src = '';
+      modal.style.display = 'none';
+    }
+
+    function downloadVideo(url, name) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      showToast('Download do vídeo iniciado!');
+    }
+
+    function renameVideo(id) {
+      const item = savedVideos.find(v => v.id === id);
+      if (!item) return;
+      const newName = prompt('Novo nome do arquivo:', item.name);
+      if (newName && newName.trim()) {
+        item.name = newName.trim().endsWith('.webm') || newName.trim().endsWith('.mp4') ? newName.trim() : newName.trim() + '.webm';
+        renderGallery();
+        showToast('Vídeo renomeado!');
+      }
+    }
+
+    function deleteVideo(id) {
+      if (confirm('Deseja realmente excluir esta gravação?')) {
+        savedVideos = savedVideos.filter(v => v.id !== id);
+        renderGallery();
+        showToast('Vídeo excluído da galeria.');
+      }
+    }
+
+    // Toast
+    function showToast(msg) {
+      toastMsg.textContent = msg;
+      toastNotice.classList.add('show');
+      setTimeout(() => {
+        toastNotice.classList.remove('show');
+      }, 3500);
+    }
+
+    // DRAGGABLE FLOATING BUBBLE LOGIC
+    (function initDraggableBubble() {
+      let isDragging = false;
+      let startX, startY, initialX, initialY;
+
+      floatingBubble.addEventListener('pointerdown', (e) => {
+        if (e.target.tagName.toLowerCase() === 'button') return;
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        const rect = floatingBubble.getBoundingClientRect();
+        initialX = rect.left;
+        initialY = rect.top;
+        floatingBubble.setPointerCapture(e.pointerId);
+      });
+
+      floatingBubble.addEventListener('pointermove', (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        floatingBubble.style.left = (initialX + dx) + 'px';
+        floatingBubble.style.top = (initialY + dy) + 'px';
+        floatingBubble.style.right = 'auto';
+      });
+
+      floatingBubble.addEventListener('pointerup', (e) => {
+        isDragging = false;
+        try { floatingBubble.releasePointerCapture(e.pointerId); } catch(err){}
+      });
+    })();
+  </script>
+</body>
+</html>
